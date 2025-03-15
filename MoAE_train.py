@@ -181,7 +181,7 @@ if __name__ == "__main__":
         is_distributed=is_distributed,
         batch_first=True
     )
-    print(sum(p.numel() for p in m.parameters())/1e6, 'M parameters')
+    print(sum(p.numel() for p in model.parameters())/1e6, 'M parameters')
     model = model.to(device)
     # create a PyTorch optimizer
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
