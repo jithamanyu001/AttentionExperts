@@ -46,6 +46,7 @@ class MoAETrasnformer(nn.Module):
     def __init__(self,
                 vocab_size,
                 d_model,
+                max_len,
                 n_head,
                 n_head_moe,
                 experts,
@@ -57,6 +58,8 @@ class MoAETrasnformer(nn.Module):
                  ):
         super(MoAETrasnformer,self).__init__()
         self.d_model = d_model
+        self.vocab_size = vocab_size
+        self.max_len = max_len
         self.n_head = n_head
         self.experts = experts
         self.top_n = top_n
@@ -64,6 +67,7 @@ class MoAETrasnformer(nn.Module):
         self.dropout = dropout
         self.batch_first = batch_first
         self.embedding = nn.Embedding(vocab_size,d_model)
+        self.pos_embedding = nn.Embedding(max_len,d_model)
         self.transformer_layers = nn.ModuleList([
             MoAETrasnformerBlock(d_model,n_head,n_head_moe,experts,top_n,dropout,is_distributed,batch_first) for _ in range(n_layers)
         ])
@@ -72,7 +76,10 @@ class MoAETrasnformer(nn.Module):
         mask = torch.triu(torch.ones(seq_length, seq_length), diagonal=1).bool()
         return mask
     def forward(self,x,key_padding_mask=None,is_causal=False):
+        B,S = x.shape
         x = self.embedding(x)
+        pos_embed = self.pos_embedding(torch.arange(S, device=device))
+        x = x + pos_embed
         attn_mask = self.get_causal_mask(x.shape[1]).to(x.device)
         total_aux_loss = torch.tensor(0.).to(x.device)
         for layer in self.transformer_layers:
@@ -80,8 +87,17 @@ class MoAETrasnformer(nn.Module):
             total_aux_loss = total_aux_loss + aux_loss
         x = self.head(x)
         return x,total_aux_loss
-    def generate(self,):
-        pass
+    def generate(self,idx,max_new_tokens=128):
+        B,T = idx.shape
+        for _ in range(max_new_tokens):
+            idx_cond = idx[:,-self.max_len:]
+            logits, _ = self(idx_cond)
+            logits = logits[:,-1,:]
+            probs = F.softmax(logits,dim=-1)
+            idx_next = torch.multinomial(probs, num_samples=1)
+            idx = torch.cat((idx,idx_next),dim=1)
+        return idx
+
 
 # data loading
 def get_batch(split,train_data,val_data):
@@ -113,21 +129,21 @@ def estimate_loss(model,train_data,val_data):
     
 if __name__ == "__main__":
     # hyperparameters
-    batch_size = 16 # how many independent sequences will we process in parallel?
+    batch_size = 128 # how many independent sequences will we process in parallel?
     block_size = 32 # what is the maximum context length for predictions?
-    max_iters = 5000
+    max_iters = 2500
     eval_interval = 100
     learning_rate = 3e-4
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     eval_iters = 200
     n_embd = 64
     n_head = 4
-    n_head_moe = 4
-    experts = 8
+    n_head_moe = 2
+    experts = 4
     top_n = 2
     n_layer = 4
-    dropout = 0.1
-    is_distributed = None
+    dropout = 0.0
+    is_distributed = False
     # ------------
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     torch.manual_seed(1337)
@@ -155,6 +171,7 @@ if __name__ == "__main__":
     model = MoAETrasnformer(
         vocab_size=vocab_size,
         d_model=n_embd,
+        max_len=block_size, 
         n_head=n_head,
         n_head_moe=n_head_moe,
         experts=experts,
@@ -164,6 +181,7 @@ if __name__ == "__main__":
         is_distributed=is_distributed,
         batch_first=True
     )
+    print(sum(p.numel() for p in m.parameters())/1e6, 'M parameters')
     model = model.to(device)
     # create a PyTorch optimizer
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
@@ -179,11 +197,12 @@ if __name__ == "__main__":
         xb, yb = get_batch('train',train_data,val_data)
         b,s = xb.shape
         # evaluate the loss
-        import pdb;pdb.set_trace()
         outputs,aux_loss = model(xb,is_causal=True)
         loss = loss_fn(outputs.view(b*s,-1),yb.view(b*s)) + aux_loss
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
-
+    model.eval()
+    context = torch.zeros((1, 1), dtype=torch.long, device=device)
+    print(decode(model.generate(context, max_new_tokens=2000)[0].tolist()))
     import pdb;pdb.set_trace()
