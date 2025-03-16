@@ -215,7 +215,7 @@ if __name__ == "__main__":
     config = {
         "batch_size": 256,
         "block_size": 32,
-        "max_iters": 5000,
+        "max_iters": 2500,
         "eval_interval": 100,
         "learning_rate": 3e-4,
         "device": "cuda" if torch.cuda.is_available() else "cpu",
