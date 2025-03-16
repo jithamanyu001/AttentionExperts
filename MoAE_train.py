@@ -213,8 +213,8 @@ def run(rank, world_size, config):
 if __name__ == "__main__":
     # Configurable hyperparameters
     config = {
-        "batch_size": 128,
-        "block_size": 64,
+        "batch_size": 256,
+        "block_size": 32,
         "max_iters": 5000,
         "eval_interval": 100,
         "learning_rate": 3e-4,
@@ -222,7 +222,7 @@ if __name__ == "__main__":
         "eval_iters": 200,
         "d_model": 128,
         "n_head": 4,
-        "n_head_moe": 2,
+        "n_head_moe": 4,
         "experts": 4,
         "top_n": 2,
         "n_layers": 4,
@@ -230,7 +230,7 @@ if __name__ == "__main__":
     }
 
     # Load dataset
-    with open('sherlock_holmes.txt', 'r', encoding='utf-8') as f:
+    with open('shakespear.txt', 'r', encoding='utf-8') as f:
         text = f.read()
 
     chars = sorted(list(set(text)))
