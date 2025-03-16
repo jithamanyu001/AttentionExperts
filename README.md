@@ -5,6 +5,11 @@
 ## **Overview**  
 This repository provides a **distributed and scalable implementation** of MoAE, allowing for efficient **parallelized training** of attention-based expert models. The base MoE implementation is adapted from [st-moe](https://github.com/lucidrains/st-moe-pytorch), a high-performance parallelized MoE framework.
 
+## Install requirements
+```sh
+pip install -r requirements.txt
+```
+
 ## **Code Structure**  
 -  **`MoAE_train.py`** – Complete training script for a simple **MoAE Transformer** model.  
 - **`testing_Expert.py`** – Unit tests for standard **feedforward experts** to validate outputs and gradients.  
